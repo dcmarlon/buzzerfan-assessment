@@ -3,18 +3,17 @@
 
 Test scenario
 -------------
-1. Open the Furgechat web app.
-2. Log in with the credentials from credentials.json.
-3. Verify that login succeeded (a post-login marker element appears).
+1. (Optional) Register the account first — this app stores users client-side
+   per browser session, so a fresh session must create the account before it
+   can log in. Controlled by "register_first" in credentials.json.
+2. Open the Furgechat login page and log in with the configured credentials.
+3. Verify that login succeeded (the login form is left behind).
 
 Outcome contract
 ----------------
 - On success: logs "LOGIN SUCCESSFUL" and exits 0.
 - On any failure: logs a clear error, saves a timestamped screenshot to
   ``screenshots/``, and exits with a non-zero status code.
-
-NOTE: All page locators are placeholders (SELECTOR_TBD_FROM_INSPECTOR) until
-filled in from DevTools — see pages/login_page.py.
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from __future__ import annotations
 import sys
 
 from pages.login_page import LoginPage
+from pages.register_page import RegisterPage
 from utils.config import load_config
 from utils.driver_factory import create_driver
 from utils.logger import get_logger
@@ -43,17 +43,34 @@ def main() -> int:
     try:
         # Pull all settings/credentials from credentials.json (never hardcoded).
         config = load_config()
-        base_url = config["base_url"]
+        # The login form lives on the app's /login route, not the root URL.
+        login_url = config["base_url"].rstrip("/") + config.get("login_path", "/login")
         username = config["credentials"]["username"]
         password = config["credentials"]["password"]
         timeout = config.get("timeouts", {}).get("explicit_wait_seconds", 20)
 
-        logger.info("Starting Web Login test against %s", base_url)
+        logger.info("Starting Web Login test against %s", login_url)
         driver = create_driver(config)
 
+        # This web app keeps registered users in browser storage (client-side),
+        # so a fresh session starts with no accounts. Register the account first
+        # (same browser session) so there is a user to log in as. Toggle with
+        # "register_first" in credentials.json (set false if the environment
+        # already has the account seeded server-side).
+        if config.get("register_first", False):
+            register_url = config["base_url"].rstrip("/") + config.get("register_path", "/register")
+            email = config.get("register_email", f"{username}@example.com")
+            register_page = RegisterPage(driver, timeout=timeout)
+            register_page.open(register_url)
+            logger.info("Registering '%s' first (this app stores users per browser session).", username)
+            if register_page.register(username, email, password):
+                logger.info("Account '%s' is ready for this session.", username)
+            else:
+                logger.warning("No registration confirmation seen; attempting login anyway.")
+
         login_page = LoginPage(driver, timeout=timeout)
-        login_page.open(base_url)
-        logger.info("Opened app; submitting credentials for user '%s'.", username)
+        login_page.open(login_url)
+        logger.info("Opened login page; submitting credentials for user '%s'.", username)
         login_page.login(username, password)
 
         # Confirm success by waiting for a marker element that only appears
