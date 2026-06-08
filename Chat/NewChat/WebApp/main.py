@@ -21,6 +21,7 @@ import sys
 
 from pages.login_page import LoginPage
 from pages.new_chat_page import NewChatPage
+from pages.register_page import RegisterPage
 from utils.config import load_config
 from utils.driver_factory import create_driver
 from utils.logger import get_logger
@@ -48,12 +49,29 @@ def _maybe_login(driver, base_url, login_cfg, timeout, logger) -> bool:
     if not login_cfg.get("enabled", True):
         return True  # Login explicitly disabled for this run.
 
-    login_url = base_url + login_cfg.get("path", "/login")
     username = login_cfg.get("username", "admin")
+    password = login_cfg.get("password", "password")
+
+    # This web app keeps registered users in browser storage (client-side), so a
+    # fresh session has no accounts. Register the account first (same session) so
+    # there is a user to log in as. Toggle with "register_first" in the login
+    # block of credentials.json.
+    if login_cfg.get("register_first", False):
+        register_url = base_url + login_cfg.get("register_path", "/register")
+        email = login_cfg.get("register_email", f"{username}@example.com")
+        register_page = RegisterPage(driver, timeout=timeout)
+        register_page.open(register_url)
+        logger.info("Registering '%s' first (this app stores users per browser session).", username)
+        if register_page.register(username, email, password):
+            logger.info("Account '%s' is ready for this session.", username)
+        else:
+            logger.warning("No registration confirmation seen; attempting login anyway.")
+
+    login_url = base_url + login_cfg.get("path", "/login")
     login_page = LoginPage(driver, timeout=timeout)
     login_page.open(login_url)
     logger.info("Signing in as '%s' before creating a chat.", username)
-    login_page.login(username, login_cfg.get("password", "password"))
+    login_page.login(username, password)
 
     if not login_page.is_login_successful():
         logger.error("Login failed; cannot create a chat.")

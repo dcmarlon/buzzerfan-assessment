@@ -18,12 +18,16 @@ deliberately locate the recipient by its stable ``name="recipient"`` attribute
 instead. The message textarea (``id="first-message"``) and the submit button
 (``id="create-chat-btn"``) have stable ids, so those keep their ids.
 
-(The page itself asks testers not to suggest fixes for these quirks — so we do
+A second quirk: after submitting, a "Confirm Chat" modal appears that only
+honours REAL pointer events (it checks ``event.isTrusted``). We click its Confirm
+button with a genuine Selenium pointer action (ActionChains), never a JavaScript
+click. (The page asks testers not to suggest fixes for these quirks — so we do
 not; we simply make the automation robust to them.)
 """
 
 from __future__ import annotations
 
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -40,18 +44,26 @@ class NewChatPage(BasePage):
     MESSAGE_INPUT = (By.ID, "first-message")
     SUBMIT_BUTTON = (By.ID, "create-chat-btn")
 
+    # After "Create Chat", a "Confirm Chat" modal appears. It only honours REAL
+    # pointer events (it checks event.isTrusted), so we click Confirm via a
+    # genuine Selenium pointer action (ActionChains), not a JavaScript click.
+    CONFIRM_BUTTON = (By.ID, "confirm-modal-btn")
+
     # The new-chat form itself, used to confirm we navigated AWAY from the
     # form after a successful create. (app-new-chat is the Angular host.)
     NEW_CHAT_FORM = (By.CSS_SELECTOR, "app-new-chat form")
 
-    # --- Optional locators (PLACEHOLDERS — fill in from the post-create DOM) -
-    # A stronger, positive success assertion (e.g. the opened conversation view
-    # or the sent-message bubble). Fill in to assert this in addition to the
-    # form disappearing.
-    SUCCESS_MARKER = (By.CSS_SELECTOR, "SELECTOR_TBD_FROM_INSPECTOR")
+    # Success confirmation: after confirming, the app shows an inline
+    # "Chat with <recipient> created!" message (it keeps the form on screen
+    # rather than navigating away).
+    SUCCESS_MARKER = (By.XPATH, "//*[contains(text(), 'created!')]")
 
-    # An error banner shown on a FAILED create (e.g. "unknown recipient"). The
-    # form DOM shows none; fill in if the app renders one, for clearer errors.
+    # Quirk: the first "Create Chat" click often fails with "Hmm, something went
+    # wrong. Please click Create again." Detected so the click can be retried.
+    RETRY_ERROR = (By.XPATH, "//*[contains(text(), 'went wrong')]")
+
+    # An error banner shown on a genuine failed create (e.g. "unknown
+    # recipient"). Left as a placeholder; the app showed none to capture.
     ERROR_MESSAGE = (By.CSS_SELECTOR, "SELECTOR_TBD_FROM_INSPECTOR")
 
     def __init__(self, driver: WebDriver, timeout: int = 20) -> None:
@@ -74,34 +86,58 @@ class NewChatPage(BasePage):
         """
         return self.wait_present(self.NEW_CHAT_FORM)
 
-    def create_chat(self, recipient: str, message: str) -> None:
-        """Fill the recipient and first message, then submit the form.
+    def create_chat(self, recipient: str, message: str, max_attempts: int = 5) -> bool:
+        """Fill the form and create the chat, handling the page's two quirks.
+
+        Quirk 1: the first "Create Chat" click often fails with "Hmm, something
+        went wrong. Please click Create again." — so we retry the click.
+        Quirk 2: a "Confirm Chat" modal then appears that only honours real
+        pointer events — so confirm_chat() clicks it with a genuine pointer.
 
         Args:
             recipient: The username to start the chat with.
             message: The first message to send.
+            max_attempts: How many times to (re)click Create while fighting the
+                intermittent "something went wrong" quirk.
+
+        Returns:
+            True if the success confirmation appeared, else False.
         """
         self.type_text(self.RECIPIENT_INPUT, recipient)
         self.type_text(self.MESSAGE_INPUT, message)
-        self.click(self.SUBMIT_BUTTON)
+        for _ in range(max_attempts):
+            self.click(self.SUBMIT_BUTTON)
+            # The modal may open now, or this click may have hit the "something
+            # went wrong" quirk — wait briefly for the confirmation modal.
+            if self.is_visible(self.CONFIRM_BUTTON, timeout=5):
+                self.confirm_chat()
+                if self.is_visible(self.SUCCESS_MARKER, timeout=5):
+                    return True
+            # No modal / no success yet -> retry quirk; loop and click again.
+        return False
+
+    def confirm_chat(self) -> None:
+        """Click Confirm on the 'Confirm Chat' modal using a real pointer event.
+
+        The modal checks ``event.isTrusted`` (its note: "only responds to real
+        human pointer events"). Selenium's pointer input produces trusted events
+        — unlike a JavaScript click — so we move the real pointer onto the button
+        and click it via ActionChains.
+        """
+        button = self.find_clickable(self.CONFIRM_BUTTON)
+        ActionChains(self.driver).move_to_element(button).click().perform()
 
     def is_chat_created(self) -> bool:
-        """Return True once the chat has clearly been created.
+        """Return True once the app confirms the chat was created.
 
-        Primary signal: the new-chat form disappears, because the single-page
-        app navigates away from <app-new-chat> on success. If a positive
-        success marker is configured, that is required as well.
+        The app shows an inline "Chat with <recipient> created!" message after a
+        successful confirm (it keeps the form on screen rather than navigating
+        away), so success is asserted by that confirmation appearing.
 
         Returns:
-            True if creation is confirmed within the timeout, else False.
+            True if the confirmation is visible within the timeout, else False.
         """
-        left_form = self.wait_invisible(self.NEW_CHAT_FORM)
-
-        # If a positive marker has been filled in, require it too; otherwise
-        # rely on the new-chat form going away.
-        if self.SUCCESS_MARKER[1] != "SELECTOR_TBD_FROM_INSPECTOR":
-            return left_form and self.is_visible(self.SUCCESS_MARKER)
-        return left_form
+        return self.is_visible(self.SUCCESS_MARKER)
 
     def get_error_text(self) -> str:
         """Return the on-screen error message, or an empty string if none.
