@@ -1,0 +1,16 @@
+{
+  "appium_server": "http://127.0.0.1:4723",
+  "timeouts": {
+    "element_wait_seconds": 20,
+    "success_wait_seconds": 15
+  },
+  "capabilities": {
+    "platformName": "Android",
+    "appium:automationName": "UiAutomator2",
+    "appium:deviceName": "emulator-5554",
+    "appium:app": "__SET_AT_RUNTIME_FROM_credentials.apk_path__",
+    "appium:autoGrantPermissions": true,
+    "appium:newCommandTimeout": 120,
+    "appium:noReset": false
+  }
+}

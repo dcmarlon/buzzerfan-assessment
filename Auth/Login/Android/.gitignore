@@ -1,0 +1,11 @@
+# Auth/Login/Android/.gitignore
+# The real credentials file holds machine-specific values and is NOT committed;
+# commit credentials.example.json instead.
+credentials.json
+
+# Generated at runtime — not source code, keep out of version control.
+venv/
+__pycache__/
+*.pyc
+logs/
+screenshots/

@@ -1,0 +1,79 @@
+# Chat/NewChat/Android/pages/new_dm_dialog.py
+"""'Start New DM' dialog page object for the Furgechat Android app.
+
+This dialog appears after tapping the new-chat FAB. It has a contact-name input
+and Create / Cancel buttons. After Create, the app shows a transient toast
+("DM Creation Approved for '<name>'!") and opens the conversation.
+"""
+
+from __future__ import annotations
+
+from appium.webdriver.common.appiumby import AppiumBy
+from appium.webdriver.webdriver import WebDriver
+
+from pages.base_page import BasePage
+
+
+class NewDmDialog(BasePage):
+    """Page object for the 'Start New DM' dialog."""
+
+    TITLE = (AppiumBy.ACCESSIBILITY_ID, "Start New DM")
+
+    # First (and only) EditText on the dialog: the contact-name input.
+    CONTACT_INPUT = (
+        AppiumBy.ANDROID_UIAUTOMATOR,
+        'new UiSelector().className("android.widget.EditText").instance(0)',
+    )
+
+    CREATE_BUTTON = (AppiumBy.ACCESSIBILITY_ID, "Create")
+    CANCEL_BUTTON = (AppiumBy.ACCESSIBILITY_ID, "Cancel")  # captured for reuse
+
+    # Transient confirmation toast. The contact name is embedded, so we match on
+    # the stable prefix with descriptionContains rather than the exact string.
+    APPROVAL_TOAST = (
+        AppiumBy.ANDROID_UIAUTOMATOR,
+        'new UiSelector().descriptionContains("DM Creation Approved for")',
+    )
+
+    def __init__(self, driver: WebDriver, timeout: int = 20) -> None:
+        """Initialize the dialog page object.
+
+        Args:
+            driver: The active Appium driver.
+            timeout: Maximum seconds any explicit wait will block.
+        """
+        super().__init__(driver, timeout)
+
+    def wait_until_visible(self) -> bool:
+        """Return True if the 'Start New DM' dialog title appears in time."""
+        return self.is_present(self.TITLE)
+
+    def enter_contact(self, name: str) -> None:
+        """Type the contact name into the dialog's input field.
+
+        Args:
+            name: The contact name for the new DM.
+        """
+        self.type_text(self.CONTACT_INPUT, name)
+
+    def tap_create(self) -> None:
+        """Tap the Create button to create the DM."""
+        self.tap(self.CREATE_BUTTON)
+
+    def tap_cancel(self) -> None:
+        """Tap the Cancel button to dismiss the dialog (unused; kept for reuse)."""
+        self.tap(self.CANCEL_BUTTON)
+
+    def wait_for_approval_toast(self, timeout: int = 8) -> bool:
+        """Return True if the transient 'DM Creation Approved' toast is caught.
+
+        The toast only shows for a few seconds, so this is best-effort: a False
+        result is NOT a failure (the real success check is that messages send).
+
+        Args:
+            timeout: Maximum seconds to watch for the toast.
+
+        Returns:
+            True if the toast was observed before the timeout, else False.
+        """
+        return self.is_present(self.APPROVAL_TOAST, timeout=timeout)

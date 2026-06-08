@@ -1,0 +1,10 @@
+# Auth/Registration/Android/requirements.txt
+# Pinned for reproducibility. Appium-Python-Client brings in Selenium 4 and
+# provides UiAutomator2Options + the AppiumBy locator strategies used here.
+#
+# NOTE: these are the PYTHON client libraries only. The Appium 2 SERVER and the
+# uiautomator2 driver are installed separately via npm (see Guide.MD):
+#     npm install -g appium
+#     appium driver install uiautomator2
+Appium-Python-Client==4.0.0
+selenium==4.18.1

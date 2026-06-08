@@ -1,0 +1,4 @@
+# Chat/NewChat/WebApp/requirements.txt
+# Selenium 4.21+ ships with Selenium Manager, which downloads the matching
+# ChromeDriver automatically — no separate driver binary is needed.
+selenium>=4.21

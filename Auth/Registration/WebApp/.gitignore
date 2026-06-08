@@ -1,0 +1,7 @@
+# Auth/Registration/WebApp/.gitignore
+# Generated at runtime — not source code, keep out of version control.
+venv/
+__pycache__/
+*.pyc
+logs/
+screenshots/
