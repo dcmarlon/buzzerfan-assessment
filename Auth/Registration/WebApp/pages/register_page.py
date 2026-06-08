@@ -11,13 +11,10 @@ so per the locator-priority rule (data-testid > id > name > CSS > XPath) we use
 the stable element IDs. Unlike the login screen, the register form has no
 captcha and the submit button is enabled from the start.
 
-Still pending (need the POST-REGISTRATION DOM):
-    SUCCESS_MARKER  — an optional positive marker shown after a successful
-                      registration (e.g. a confirmation banner or chat list).
-    ERROR_MESSAGE   — an optional error banner shown on a failed registration
-                      (e.g. "username already taken").
-Both are placeholders; the test does not depend on them (see
-is_registration_successful).
+Success is detected by the inline "Account created for <name>!" confirmation the
+app shows after a valid submit — it keeps the form on screen rather than
+navigating away. ERROR_MESSAGE is left as a placeholder; the app showed no error
+banner to capture, so a failed run is reported generically.
 """
 
 from __future__ import annotations
@@ -42,10 +39,11 @@ class RegisterPage(BasePage):
     # Angular host component.)
     REGISTER_FORM = (By.CSS_SELECTOR, "app-register form")
 
-    # --- Optional locators (PLACEHOLDERS — fill in from the post-register DOM)
-    # A stronger, positive success assertion (e.g. a "welcome" banner or the
-    # chat list). Fill in to assert this in addition to the form disappearing.
-    SUCCESS_MARKER = (By.CSS_SELECTOR, "SELECTOR_TBD_FROM_INSPECTOR")
+    # Success confirmation: this app keeps the form on screen and shows an
+    # inline "Account created for <name>!" message (it does NOT navigate away).
+    # No id exists on the message, so a relative text-based XPath is the only
+    # hook (last resort per the locator-priority rule).
+    SUCCESS_MARKER = (By.XPATH, "//*[contains(text(), 'Account created')]")
 
     # An error banner shown on a FAILED registration. The register DOM shows
     # none; fill this in if the app renders one, for a clearer failure message.
@@ -74,23 +72,16 @@ class RegisterPage(BasePage):
         self.click(self.SUBMIT_BUTTON)
 
     def is_registration_successful(self) -> bool:
-        """Return True once registration has clearly succeeded.
+        """Return True once the app confirms the account was created.
 
-        Primary signal: the registration form disappears, because the
-        single-page app navigates away from <app-register> on success. If a
-        positive success marker is configured, that is required as well for a
-        stronger check.
+        This web app keeps the registration form on screen and shows an inline
+        "Account created for <name>!" confirmation rather than navigating away,
+        so success is asserted by that confirmation message appearing.
 
         Returns:
-            True if registration is confirmed within the timeout, else False.
+            True if the confirmation appears within the timeout, else False.
         """
-        left_register_page = self.wait_invisible(self.REGISTER_FORM)
-
-        # If a positive marker has been filled in, require it too; otherwise
-        # rely on the registration form going away.
-        if self.SUCCESS_MARKER[1] != "SELECTOR_TBD_FROM_INSPECTOR":
-            return left_register_page and self.is_visible(self.SUCCESS_MARKER)
-        return left_register_page
+        return self.is_visible(self.SUCCESS_MARKER)
 
     def get_error_text(self) -> str:
         """Return the on-screen error message, or an empty string if none.
