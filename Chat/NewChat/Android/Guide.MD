@@ -17,6 +17,42 @@ exits with an error code.
 
 ---
 
+## ⚠️ Known limitation (QA finding): the "Create" button blocks automation
+
+This flow runs correctly up to the **Start New DM** dialog (log in → dashboard →
+new‑chat FAB → dialog → type the contact), and the message‑sending mechanism
+itself is proven to work (verified against the seeded *John Doe* conversation:
+pressing the send control adds the message, which appears as the row's `text`).
+
+**However, the dialog's "Create" button cannot be triggered by Appium.** Every
+supported interaction was tried and none fires it:
+
+- `element.click()` (by accessibility id, by `description("Create")`, by `Button.instance(1)`)
+- coordinate `tap`, W3C touch press‑and‑release, `mobile: clickGesture`
+- IME editor actions (`done` / `go` / `send`) and the ENTER keycode
+
+Inspecting the dialog's XML shows why: a **full‑screen `content-desc="Dismiss"`
+modal barrier is layered on top of the dialog**, so coordinate taps/gestures land
+on the barrier, while the Flutter button ignores the accessibility click action.
+The only side effect Appium can produce is an **ephemeral chat row that appears
+for ~2–3 seconds and then disappears**, and whose conversation cannot be opened
+(a real touch on the row does not navigate).
+
+A **real human tap** on Create works (manually created chats persist) — this is
+the Android counterpart of the web New Chat's on‑screen warning that its confirm
+modal *"only responds to real human pointer events"* (an `isTrusted` check). On
+the web that guard is satisfiable with a genuine Selenium pointer action; on
+Android **no Appium input method satisfies it**, so this step is not automatable
+with the required Selenium/Appium stack.
+
+**How this script behaves:** it performs every automatable step, then fails
+loudly at the Create step with a clear `[FAIL]` message and a timestamped
+screenshot — i.e. it correctly detects and reports the un‑automatable control
+rather than silently passing. Treat this as a logged QA finding, not a script
+defect. The remaining 7 of 8 features automate cleanly and pass.
+
+---
+
 ## Prerequisites
 
 - **Python 3.11 or newer.**

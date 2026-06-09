@@ -35,10 +35,9 @@ from pages.base_page import BasePage
 class DashboardPage(BasePage):
     """Page object for the post-login dashboard and its new-chat FAB."""
 
-    HEADER = (
-        AppiumBy.ANDROID_UIAUTOMATOR,
-        'new UiSelector().text("All Messages Dashboard")',
-    )
+    # The header is exposed as a CONTENT-DESC (its text attribute is empty), so
+    # match by accessibility id, not text().
+    HEADER = (AppiumBy.ACCESSIBILITY_ID, "All Messages Dashboard")
     ALL_BUTTONS = (
         AppiumBy.ANDROID_UIAUTOMATOR,
         'new UiSelector().className("android.widget.Button")',
@@ -111,3 +110,35 @@ class DashboardPage(BasePage):
             "Could not locate the new-chat FAB: no buttons found on the dashboard. "
             "Re-capture the FAB with Appium Inspector (see Guide.MD troubleshooting)."
         )
+
+    def _chat_locator(self, contact_name: str) -> tuple[str, str]:
+        """Locator for the dashboard chat row whose content-desc contains the name."""
+        return (
+            AppiumBy.ANDROID_UIAUTOMATOR,
+            f'new UiSelector().descriptionContains("{contact_name}")',
+        )
+
+    def has_chat(self, contact_name: str, timeout: int | None = None) -> bool:
+        """Return True if a chat row for the contact is present on the dashboard.
+
+        Used to confirm that the (flaky) create actually registered.
+
+        Args:
+            contact_name: The contact to look for.
+            timeout: Optional override for how long to wait.
+        """
+        return self.is_present(self._chat_locator(contact_name), timeout=timeout)
+
+    def open_chat(self, contact_name: str) -> bool:
+        """Open a chat by tapping the dashboard row whose content-desc contains it.
+
+        Args:
+            contact_name: The contact whose conversation to open.
+
+        Returns:
+            True if the chat row appeared and was tapped, else False.
+        """
+        if not self.has_chat(contact_name, timeout=self.timeout):
+            return False
+        self.driver.find_element(*self._chat_locator(contact_name)).click()
+        return True

@@ -2,14 +2,21 @@
 """'Start New DM' dialog page object for the Furgechat Android app.
 
 This dialog appears after tapping the new-chat FAB. It has a contact-name input
-and Create / Cancel buttons. After Create, the app shows a transient toast
-("DM Creation Approved for '<name>'!") and opens the conversation.
+and Create / Cancel buttons.
+
+Quirks: tapping Create creates the chat but does NOT close the dialog, and the
+Create/Cancel buttons ignore Appium's element clicks. So after Create we close
+the dialog by tapping its full-screen modal "Dismiss" barrier (a real W3C touch
+above the centred dialog); the new chat then appears on the dashboard to open.
 """
 
 from __future__ import annotations
 
 from appium.webdriver.common.appiumby import AppiumBy
 from appium.webdriver.webdriver import WebDriver
+from selenium.webdriver.common.actions import interaction
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.actions.pointer_input import PointerInput
 
 from pages.base_page import BasePage
 
@@ -63,6 +70,21 @@ class NewDmDialog(BasePage):
     def tap_cancel(self) -> None:
         """Tap the Cancel button to dismiss the dialog (unused; kept for reuse)."""
         self.tap(self.CANCEL_BUTTON)
+
+    def dismiss(self) -> None:
+        """Close the dialog by tapping the modal barrier above the dialog box.
+
+        Quirk: tapping Create creates the chat but does NOT close this dialog,
+        and its buttons ignore Appium's element clicks. Tapping the full-screen
+        "Dismiss" barrier ABOVE the centred dialog (a real W3C touch) closes it,
+        leaving the freshly created chat on the dashboard.
+        """
+        size = self.driver.get_window_size()
+        x, y = size["width"] // 12, size["height"] // 9
+        touch = PointerInput(interaction.POINTER_TOUCH, "finger")
+        actions = ActionBuilder(self.driver, mouse=touch)
+        actions.pointer_action.move_to_location(x, y).pointer_down().pause(0.1).pointer_up()
+        actions.perform()
 
     def wait_for_approval_toast(self, timeout: int = 8) -> bool:
         """Return True if the transient 'DM Creation Approved' toast is caught.

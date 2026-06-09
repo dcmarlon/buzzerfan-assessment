@@ -3,17 +3,17 @@
 
 Handles the conversation screen: typing a message, sending it (with a fallback),
 and verifying it landed. Each sent message appears in the thread as an element
-whose ``content-desc`` equals the message text.
+whose ``text`` equals the message (NOT its content-desc).
 
 Sending strategy
 ----------------
-The send control was not captured in the Inspector, so ``send_message`` tries
-two ways and reports which worked:
-    1. Tap the first Button on the chat screen (likely the send arrow).
-    2. If no message bubble appears, press the Android ENTER key (keycode 66).
-After each attempt it waits for the message's bubble (content-desc == text) to
-confirm the send actually landed — that wait doubles as the "short pause"
-between messages, so no fixed ``time.sleep`` is ever used.
+The chat screen has two buttons: a top-left "Back" arrow (instance 0) and the
+send icon to the right of the input (instance 1). ``send_message`` taps the send
+button (instance 1 — NOT the back arrow, which would leave the conversation) and,
+if the bubble does not appear, falls back to pressing the Android ENTER key
+(keycode 66), which also sends. After each attempt it waits for the message's
+bubble (matched by visible text) to confirm the send landed — that wait doubles
+as the "short pause" between messages, so no fixed ``time.sleep`` is ever used.
 """
 
 from __future__ import annotations
@@ -42,10 +42,11 @@ class ChatPage(BasePage):
         AppiumBy.ANDROID_UIAUTOMATOR,
         'new UiSelector().className("android.widget.EditText").instance(0)',
     )
-    # Best-guess send control: the first Button on the chat screen.
+    # Send control: the icon button to the RIGHT of the input. Instance 0 is the
+    # top-left "Back" arrow, so the send button is instance 1.
     SEND_BUTTON = (
         AppiumBy.ANDROID_UIAUTOMATOR,
-        'new UiSelector().className("android.widget.Button").instance(0)',
+        'new UiSelector().className("android.widget.Button").instance(1)',
     )
 
     def __init__(self, driver: WebDriver, timeout: int = 20) -> None:
@@ -67,10 +68,10 @@ class ChatPage(BasePage):
         self.find_visible(self.MESSAGE_INPUT)
 
     def message_locator(self, text: str) -> tuple[str, str]:
-        """Build a locator that matches a sent message by its content-desc."""
+        """Build a locator that matches a sent message by its visible text."""
         return (
             AppiumBy.ANDROID_UIAUTOMATOR,
-            f'new UiSelector().description("{_ui_escape(text)}")',
+            f'new UiSelector().text("{_ui_escape(text)}")',
         )
 
     def is_message_visible(self, text: str, timeout: int | None = None) -> bool:

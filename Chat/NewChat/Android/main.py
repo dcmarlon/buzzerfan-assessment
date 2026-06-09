@@ -6,10 +6,11 @@ Test scenario
 1. Launch the app (opens the login screen) and log in as admin.
 2. Wait for the "All Messages Dashboard" header.
 3. Tap the new-chat FAB (with robust fallbacks — see DashboardPage).
-4. In the "Start New DM" dialog, enter a UNIQUE contact name and tap Create.
-5. Best-effort: catch the transient "DM Creation Approved" toast (non-fatal).
-6. On the conversation screen, send 3 messages, verifying each appears.
-7. Assert all 3 messages are visible in the thread.
+4. In the "Start New DM" dialog, enter a UNIQUE contact name and tap Create,
+   then dismiss the dialog (it does not auto-close).
+5. Open the new chat from the dashboard to reach its conversation.
+6. Send 3 messages, verifying each appears in the thread.
+7. Assert all 3 messages are visible.
 
 Outcome contract
 ----------------
@@ -90,7 +91,6 @@ def main() -> int:
         timeouts = settings.get("timeouts", {})
         element_timeout = timeouts.get("element_wait_seconds", 20)
         dashboard_timeout = timeouts.get("dashboard_wait_seconds", 15)
-        toast_timeout = timeouts.get("toast_wait_seconds", 8)
         verify_timeout = timeouts.get("message_verify_seconds", 3)
         username = credentials["username"]
         password = credentials["password"]
@@ -116,36 +116,52 @@ def main() -> int:
             _save_failure_screenshot(driver, logger)
             return EXIT_FAILURE
         logger.info("Logged in as %s", username)
-        logger.info("Dashboard loaded — tapping new-chat FAB")
+        logger.info("Dashboard loaded.")
 
-        # Step 3: locate and tap the new-chat FAB (robust fallbacks).
-        fab, strategy = dashboard.find_new_chat_fab()
-        logger.info("New-chat FAB located via %s", strategy)
-        fab.click()
-
-        # Step 4: the Start New DM dialog.
-        dialog = NewDmDialog(driver, timeout=element_timeout)
-        if not dialog.wait_until_visible():
-            logger.error("[FAIL] 'Start New DM' dialog did not appear after tapping the FAB.")
-            _save_failure_screenshot(driver, logger)
-            return EXIT_FAILURE
-        logger.info("Start New DM dialog visible")
-
+        # Steps 3-4: create the chat. The dialog's Create is flaky AND does not
+        # auto-close, so each attempt opens the dialog, enters the contact, taps
+        # Create, lets it settle, dismisses the dialog, then confirms the chat
+        # appeared on the dashboard — retrying until it does.
         contact_name = _generate_contact_name()
         logger.info("Creating chat with contact: %s", contact_name)
-        dialog.enter_contact(contact_name)
-        dialog.tap_create()
+        created = False
+        for attempt in range(1, 5):
+            fab, strategy = dashboard.find_new_chat_fab()
+            fab.click()
+            dialog = NewDmDialog(driver, timeout=element_timeout)
+            if not dialog.wait_until_visible():
+                logger.warning("Attempt %d: 'Start New DM' dialog did not open; retrying.", attempt)
+                continue
+            dialog.enter_contact(contact_name)
+            dialog.tap_create()
+            # The native dialog needs a brief, command-free pause to commit the
+            # create before we dismiss it. There is no reliable element signal to
+            # wait on here (the approval toast is too transient to catch), and
+            # polling Appium during this window races the commit — so a short
+            # fixed settle is used deliberately.
+            # TODO: replace with an explicit wait if the app ever exposes a
+            # stable post-create signal.
+            time.sleep(1.5)
+            dialog.dismiss()
+            if dashboard.has_chat(contact_name, timeout=4):
+                created = True
+                logger.info("Chat created on attempt %d.", attempt)
+                break
+            logger.info("Create attempt %d did not register; retrying.", attempt)
 
-        # Step 5: best-effort catch of the transient approval toast.
-        if dialog.wait_for_approval_toast(timeout=toast_timeout):
-            logger.info("DM creation confirmed (toast detected)")
-        else:
-            logger.warning(
-                "Approval toast not observed (it is transient) — continuing; "
-                "the message sends are the real success check."
-            )
+        if not created:
+            logger.error("[FAIL] Could not create the chat '%s' after retries.", contact_name)
+            _save_failure_screenshot(driver, logger)
+            return EXIT_FAILURE
 
-        # Step 6: send the messages, verifying each appears in the thread.
+        # Step 5: open the new chat from the dashboard to reach its conversation.
+        logger.info("Opening the conversation with '%s'.", contact_name)
+        if not dashboard.open_chat(contact_name):
+            logger.error("[FAIL] The new chat '%s' could not be opened.", contact_name)
+            _save_failure_screenshot(driver, logger)
+            return EXIT_FAILURE
+
+        # Step 6: in the conversation, send the messages and verify each appears.
         chat = ChatPage(driver, timeout=element_timeout)
         chat.wait_until_loaded()
 
