@@ -82,11 +82,16 @@ def _maybe_login(driver, base_url, login_cfg, timeout, logger) -> bool:
         email = login_cfg.get("register_email", f"{username}@example.com")
         register_page = RegisterPage(driver, timeout=timeout)
         register_page.open(register_url)
-        logger.info("Registering '%s' first (this app stores users per browser session).", username)
+        logger.info(
+            "Registering '%s' first (this app stores users per browser session).",
+            username,
+        )
         if register_page.register(username, email, password):
             logger.info("Account '%s' is ready for this session.", username)
         else:
-            logger.warning("No registration confirmation seen; attempting login anyway.")
+            logger.warning(
+                "No registration confirmation seen; attempting login anyway."
+            )
 
     login_url = base_url + login_cfg.get("path", "/login")
     login_page = LoginPage(driver, timeout=timeout)

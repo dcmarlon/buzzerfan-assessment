@@ -38,7 +38,9 @@ EXIT_FAILURE = 1
 _SCREENSHOT_DIR = Path(__file__).resolve().parent / "screenshots"
 
 
-def _save_failure_screenshot(driver, logger, label: str = "registration_failure") -> None:
+def _save_failure_screenshot(
+    driver, logger, label: str = "registration_failure"
+) -> None:
     """Save a timestamped failure screenshot to screenshots/, logging the path.
 
     Args:

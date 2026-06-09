@@ -11,7 +11,9 @@ from __future__ import annotations
 import time
 
 
-def generate_unique_email(prefix: str = "qa_test", domain: str = "buzzerfan.test") -> str:
+def generate_unique_email(
+    prefix: str = "qa_test", domain: str = "buzzerfan.test"
+) -> str:
     """Return a unique test email, e.g. ``qa_test_1717840000@buzzerfan.test``.
 
     The integer Unix timestamp suffix changes every second, so each run gets a

@@ -131,13 +131,18 @@ def main() -> int:
         chats = chat_page.get_chats()
         if not chats:
             logger.warning("No chats are currently visible under the 'Chats' tab.")
-            logger.info("[PASS] Chats screen loaded; 0 chats to list (%.1fs).", time.perf_counter() - start)
+            logger.info(
+                "[PASS] Chats screen loaded; 0 chats to list (%.1fs).",
+                time.perf_counter() - start,
+            )
             return EXIT_SUCCESS
 
         logger.info("Found %d chat(s) under the 'Chats' tab:", len(chats))
         for chat in chats:
             logger.info('  [%s] %s - "%s"', chat["id"], chat["name"], chat["preview"])
-        logger.info("[PASS] Listed %d chat(s) (%.1fs).", len(chats), time.perf_counter() - start)
+        logger.info(
+            "[PASS] Listed %d chat(s) (%.1fs).", len(chats), time.perf_counter() - start
+        )
         return EXIT_SUCCESS
 
     # Broad catch is intentional: the failure contract (clear message +

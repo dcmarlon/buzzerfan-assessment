@@ -84,7 +84,9 @@ class RegisterPage(BasePage):
             The trimmed placeholder label, or "" if none is exposed.
         """
         element = self.find_visible(locator)
-        return (element.get_attribute("hint") or element.get_attribute("text") or "").strip()
+        return (
+            element.get_attribute("hint") or element.get_attribute("text") or ""
+        ).strip()
 
     def get_email_label(self) -> str:
         """Return the email field's placeholder label (for backup verification)."""

@@ -127,14 +127,19 @@ def main() -> int:
         # Create, lets it settle, dismisses the dialog, then confirms the chat
         # appeared on the dashboard — retrying until it does.
         contact_name = _generate_contact_name()
-        logger.info("Creating chat with contact: %s (digit-free — the app rejects names with numbers).", contact_name)
+        logger.info(
+            "Creating chat with contact: %s (digit-free — the app rejects names with numbers).",
+            contact_name,
+        )
         created = False
         for attempt in range(1, 4):
             fab, strategy = dashboard.find_new_chat_fab()
             fab.click()
             dialog = NewDmDialog(driver, timeout=element_timeout)
             if not dialog.wait_until_visible():
-                logger.warning("Attempt %d: 'Start New DM' dialog did not open; retrying.", attempt)
+                logger.warning(
+                    "Attempt %d: 'Start New DM' dialog did not open; retrying.", attempt
+                )
                 continue
             dialog.enter_contact(contact_name)
             dialog.tap_create()
@@ -147,7 +152,9 @@ def main() -> int:
             logger.info("Create attempt %d did not register; retrying.", attempt)
 
         if not created:
-            logger.error("[FAIL] Could not create the chat '%s' after retries.", contact_name)
+            logger.error(
+                "[FAIL] Could not create the chat '%s' after retries.", contact_name
+            )
             _save_failure_screenshot(driver, logger)
             return EXIT_FAILURE
 
@@ -177,7 +184,11 @@ def main() -> int:
                 _save_failure_screenshot(driver, logger)
                 return EXIT_FAILURE
             sent += 1
-            logger.info("Message %d verified in conversation (sent via %s)", index, used_strategy)
+            logger.info(
+                "Message %d verified in conversation (sent via %s)",
+                index,
+                used_strategy,
+            )
 
         # Each message was verified the instant it was sent (send_message only
         # returns a strategy once that message's bubble is visible). We do NOT

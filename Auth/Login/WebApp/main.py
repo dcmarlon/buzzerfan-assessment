@@ -83,31 +83,47 @@ def main() -> int:
         # "register_first" in credentials.json (set false if the environment
         # already has the account seeded server-side).
         if config.get("register_first", False):
-            register_url = config["base_url"].rstrip("/") + config.get("register_path", "/register")
+            register_url = config["base_url"].rstrip("/") + config.get(
+                "register_path", "/register"
+            )
             email = config.get("register_email", f"{username}@example.com")
             register_page = RegisterPage(driver, timeout=timeout)
             register_page.open(register_url)
-            logger.info("Registering '%s' first (this app stores users per browser session).", username)
+            logger.info(
+                "Registering '%s' first (this app stores users per browser session).",
+                username,
+            )
             if register_page.register(username, email, password):
                 logger.info("Account '%s' is ready for this session.", username)
             else:
-                logger.warning("No registration confirmation seen; attempting login anyway.")
+                logger.warning(
+                    "No registration confirmation seen; attempting login anyway."
+                )
 
         login_page = LoginPage(driver, timeout=timeout)
         login_page.open(login_url)
-        logger.info("Opened login page; submitting credentials for user '%s'.", username)
+        logger.info(
+            "Opened login page; submitting credentials for user '%s'.", username
+        )
         login_page.login(username, password)
 
         # Confirm success by waiting for a marker element that only appears
         # once the user is authenticated.
         if login_page.is_login_successful():
-            logger.info("[PASS] Login succeeded for user '%s' (%.1fs).", username, time.perf_counter() - start)
+            logger.info(
+                "[PASS] Login succeeded for user '%s' (%.1fs).",
+                username,
+                time.perf_counter() - start,
+            )
             return EXIT_SUCCESS
 
         # Login did not succeed — capture any on-screen error for context,
         # then record visual evidence.
         error_text = login_page.get_error_text()
-        message = error_text or "Login did not complete — still on the login page (check credentials and that the captcha/submit step ran)."
+        message = (
+            error_text
+            or "Login did not complete — still on the login page (check credentials and that the captcha/submit step ran)."
+        )
         logger.error("[FAIL] Login failed: %s", message)
         shot = save_screenshot(driver, label="login_failed")
         logger.error("Screenshot saved to %s", shot)

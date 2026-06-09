@@ -101,7 +101,8 @@ class ChatPage(BasePage):
         by, value = self.MESSAGE_INPUT
         try:
             WebDriverWait(self.driver, timeout).until(
-                lambda d: (d.find_element(by, value).get_attribute("text") or "") == text
+                lambda d: (d.find_element(by, value).get_attribute("text") or "")
+                == text
             )
         except TimeoutException:
             pass

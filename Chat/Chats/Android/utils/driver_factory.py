@@ -94,7 +94,9 @@ def resolve_apk_path(apk_path: str) -> str:
     return str((_REPO_ROOT / candidate).resolve())
 
 
-def create_driver(settings: dict[str, Any], credentials: dict[str, Any]) -> webdriver.Remote:
+def create_driver(
+    settings: dict[str, Any], credentials: dict[str, Any]
+) -> webdriver.Remote:
     """Create a connected Appium (UiAutomator2) driver.
 
     The placeholder ``appium:app`` in the capabilities is replaced with the

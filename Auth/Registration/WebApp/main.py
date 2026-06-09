@@ -42,7 +42,9 @@ EXIT_FAILURE = 1
 
 def _parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Furgechat Web Registration automation.")
+    parser = argparse.ArgumentParser(
+        description="Furgechat Web Registration automation."
+    )
     parser.add_argument(
         "--headless",
         action="store_true",
@@ -67,7 +69,9 @@ def main() -> int:
         if args.headless:
             config.setdefault("browser", {})["headless"] = True
             logger.info("Headless mode enabled via --headless.")
-        register_url = config["base_url"].rstrip("/") + config.get("register_path", "/register")
+        register_url = config["base_url"].rstrip("/") + config.get(
+            "register_path", "/register"
+        )
         timeout = config.get("timeouts", {}).get("explicit_wait_seconds", 20)
 
         # Build a unique account so the test is repeatable.
