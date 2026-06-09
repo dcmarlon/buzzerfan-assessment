@@ -17,39 +17,22 @@ exits with an error code.
 
 ---
 
-## ⚠️ Known limitation (QA finding): the "Create" button blocks automation
+## ⚠️ The page's quirk: contact names must be letters-only
 
-This flow runs correctly up to the **Start New DM** dialog (log in → dashboard →
-new‑chat FAB → dialog → type the contact), and the message‑sending mechanism
-itself is proven to work (verified against the seeded *John Doe* conversation:
-pressing the send control adds the message, which appears as the row's `text`).
+The app **rejects contact names that contain digits** — it shows
+*"DM Creation Denied: '&lt;name&gt;' contains numbers"* and leaves the dialog open
+without creating the chat. (This was the trap: a timestamp-based name like
+`QaUser1717834567` is always rejected.)
 
-**However, the dialog's "Create" button cannot be triggered by Appium.** Every
-supported interaction was tried and none fires it:
+This script therefore generates a **digit-free** contact name — it maps the
+timestamp's digits to letters (`0`→`a` … `9`→`j`), e.g. `QaUserbhiajijgba`, so
+each run still gets a unique, valid name. With a valid name, tapping **Create**
+closes the dialog and the new chat appears on the dashboard; the script then
+opens it and sends the three messages.
 
-- `element.click()` (by accessibility id, by `description("Create")`, by `Button.instance(1)`)
-- coordinate `tap`, W3C touch press‑and‑release, `mobile: clickGesture`
-- IME editor actions (`done` / `go` / `send`) and the ENTER keycode
-
-Inspecting the dialog's XML shows why: a **full‑screen `content-desc="Dismiss"`
-modal barrier is layered on top of the dialog**, so coordinate taps/gestures land
-on the barrier, while the Flutter button ignores the accessibility click action.
-The only side effect Appium can produce is an **ephemeral chat row that appears
-for ~2–3 seconds and then disappears**, and whose conversation cannot be opened
-(a real touch on the row does not navigate).
-
-A **real human tap** on Create works (manually created chats persist) — this is
-the Android counterpart of the web New Chat's on‑screen warning that its confirm
-modal *"only responds to real human pointer events"* (an `isTrusted` check). On
-the web that guard is satisfiable with a genuine Selenium pointer action; on
-Android **no Appium input method satisfies it**, so this step is not automatable
-with the required Selenium/Appium stack.
-
-**How this script behaves:** it performs every automatable step, then fails
-loudly at the Create step with a clear `[FAIL]` message and a timestamped
-screenshot — i.e. it correctly detects and reports the un‑automatable control
-rather than silently passing. Treat this as a logged QA finding, not a script
-defect. The remaining 7 of 8 features automate cleanly and pass.
+> Each message is verified the instant it is sent. The script does **not**
+> re-check all three at the end, because the conversation auto-scrolls to the
+> newest message and older bubbles scroll out of the visible UI tree.
 
 ---
 

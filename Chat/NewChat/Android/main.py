@@ -6,11 +6,12 @@ Test scenario
 1. Launch the app (opens the login screen) and log in as admin.
 2. Wait for the "All Messages Dashboard" header.
 3. Tap the new-chat FAB (with robust fallbacks — see DashboardPage).
-4. In the "Start New DM" dialog, enter a UNIQUE contact name and tap Create,
-   then dismiss the dialog (it does not auto-close).
+4. In the "Start New DM" dialog, enter a UNIQUE, DIGIT-FREE contact name and tap
+   Create (the app rejects names containing numbers); the dialog closes and the
+   new chat appears on the dashboard.
 5. Open the new chat from the dashboard to reach its conversation.
-6. Send 3 messages, verifying each appears in the thread.
-7. Assert all 3 messages are visible.
+6. Send 3 messages, verifying each one appears in the conversation as it is
+   sent (the thread auto-scrolls, so verification is per-message, not at the end).
 
 Outcome contract
 ----------------
@@ -50,11 +51,14 @@ MESSAGES = [
 
 
 def _generate_contact_name() -> str:
-    """Return a unique contact name, e.g. ``QaUser1717834567``.
+    """Return a unique, DIGIT-FREE contact name, e.g. ``QaUserbhiajedd``.
 
-    The integer Unix timestamp suffix makes each run create a distinct contact.
+    The app rejects contact names that contain numbers ("DM Creation Denied:
+    '<name>' contains numbers"), so the Unix-timestamp digits are mapped to
+    letters (0->a … 9->j). The result is unique per run yet contains no digits.
     """
-    return f"QaUser{int(time.time())}"
+    letters = str(int(time.time())).translate(str.maketrans("0123456789", "abcdefghij"))
+    return f"QaUser{letters}"
 
 
 def _save_failure_screenshot(driver, logger, label: str = "new_chat_failure") -> None:
@@ -123,9 +127,9 @@ def main() -> int:
         # Create, lets it settle, dismisses the dialog, then confirms the chat
         # appeared on the dashboard — retrying until it does.
         contact_name = _generate_contact_name()
-        logger.info("Creating chat with contact: %s", contact_name)
+        logger.info("Creating chat with contact: %s (digit-free — the app rejects names with numbers).", contact_name)
         created = False
-        for attempt in range(1, 5):
+        for attempt in range(1, 4):
             fab, strategy = dashboard.find_new_chat_fab()
             fab.click()
             dialog = NewDmDialog(driver, timeout=element_timeout)
@@ -134,16 +138,9 @@ def main() -> int:
                 continue
             dialog.enter_contact(contact_name)
             dialog.tap_create()
-            # The native dialog needs a brief, command-free pause to commit the
-            # create before we dismiss it. There is no reliable element signal to
-            # wait on here (the approval toast is too transient to catch), and
-            # polling Appium during this window races the commit — so a short
-            # fixed settle is used deliberately.
-            # TODO: replace with an explicit wait if the app ever exposes a
-            # stable post-create signal.
-            time.sleep(1.5)
-            dialog.dismiss()
-            if dashboard.has_chat(contact_name, timeout=4):
+            # A valid (digit-free) name is accepted: the dialog closes and the new
+            # chat appears on the dashboard. Confirm it before continuing.
+            if dashboard.has_chat(contact_name, timeout=8):
                 created = True
                 logger.info("Chat created on attempt %d.", attempt)
                 break
@@ -182,13 +179,11 @@ def main() -> int:
             sent += 1
             logger.info("Message %d verified in conversation (sent via %s)", index, used_strategy)
 
-        # Step 7: final assertion — every message is still visible in the thread.
-        missing = [m for m in MESSAGES if not chat.is_message_visible(m, timeout=verify_timeout)]
-        if missing:
-            logger.error("[FAIL] These sent messages are not visible in the thread: %s", missing)
-            _save_failure_screenshot(driver, logger)
-            return EXIT_FAILURE
-
+        # Each message was verified the instant it was sent (send_message only
+        # returns a strategy once that message's bubble is visible). We do NOT
+        # re-assert all three together at the end: the conversation auto-scrolls
+        # to the newest message, so older bubbles scroll out of the visible
+        # accessibility tree and would yield false negatives.
         elapsed = time.perf_counter() - start
         logger.info(
             "[PASS] New chat created with %s and %d messages sent (%.1fs)",

@@ -112,10 +112,12 @@ class DashboardPage(BasePage):
         )
 
     def _chat_locator(self, contact_name: str) -> tuple[str, str]:
-        """Locator for the dashboard chat row whose content-desc contains the name."""
+        """Locator for the dashboard chat-row BUTTON whose content-desc contains
+        the name. Scoping to the Button avoids matching the transient
+        "DM Creation Approved" toast, which also contains the name."""
         return (
             AppiumBy.ANDROID_UIAUTOMATOR,
-            f'new UiSelector().descriptionContains("{contact_name}")',
+            f'new UiSelector().className("android.widget.Button").descriptionContains("{contact_name}")',
         )
 
     def has_chat(self, contact_name: str, timeout: int | None = None) -> bool:
