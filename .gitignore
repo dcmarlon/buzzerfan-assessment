@@ -1,7 +1,8 @@
-# Repo-root .gitignore (safety net; each feature folder also has its own).
-# NOTE: credentials.json is intentionally NOT ignored globally — the Web
-# features commit it as a required deliverable, while the Android features
-# ignore it locally via their own .gitignore and commit credentials.example.json.
+# Repo-root .gitignore (each feature folder also has its own).
+
+# Secrets — real credentials are NEVER committed. Each feature ships a
+# credentials.example.json template; copy it to credentials.json and fill it in.
+credentials.json
 
 # Python
 __pycache__/
@@ -14,9 +15,10 @@ venv/
 .venv/
 env/
 
-# Test run artifacts (also ignored per-feature)
+# Test run artifacts
 **/logs/
 **/screenshots/
+*.log
 
 # OS / editor
 .DS_Store
