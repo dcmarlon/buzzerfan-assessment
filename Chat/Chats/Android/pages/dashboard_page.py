@@ -26,11 +26,9 @@ from pages.base_page import BasePage
 class DashboardPage(BasePage):
     """Page object for the post-login messages dashboard and its chat list."""
 
-    # The header confirms login completed and the dashboard rendered.
-    HEADER = (
-        AppiumBy.ANDROID_UIAUTOMATOR,
-        'new UiSelector().text("All Messages Dashboard")',
-    )
+    # The header confirms login completed. It is exposed as a CONTENT-DESC (its
+    # text attribute is empty), so match by accessibility id, not text().
+    HEADER = (AppiumBy.ACCESSIBILITY_ID, "All Messages Dashboard")
 
     # Every button on the dashboard; chat rows are a subset of these.
     CHAT_BUTTONS = (

@@ -57,6 +57,9 @@ class BasePage:
             text: The value to enter.
         """
         element = self.find_visible(locator)
+        # Tap to focus first — some Flutter fields ignore send_keys unless they
+        # already hold focus (e.g. the password field stays empty without this).
+        element.click()
         element.clear()
         element.send_keys(text)
 

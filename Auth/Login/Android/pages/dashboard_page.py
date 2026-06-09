@@ -17,11 +17,10 @@ from pages.base_page import BasePage
 class DashboardPage(BasePage):
     """Page object for the post-login messages dashboard."""
 
-    # The header text only exists once the user is logged in.
-    HEADER = (
-        AppiumBy.ANDROID_UIAUTOMATOR,
-        'new UiSelector().text("All Messages Dashboard")',
-    )
+    # The header only exists once logged in. It is exposed as a CONTENT-DESC
+    # (the element's text attribute is empty), so we match it by accessibility
+    # id — not by text(), which never matches.
+    HEADER = (AppiumBy.ACCESSIBILITY_ID, "All Messages Dashboard")
 
     def __init__(self, driver: WebDriver, timeout: int = 15) -> None:
         """Initialize the dashboard page object.
