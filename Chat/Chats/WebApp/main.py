@@ -11,13 +11,22 @@ Outcome contract
 ----------------
 - On success: prints the list of chats and exits 0. An empty list is still a
   success (it just means there are no chats to show), logged as a warning.
-- On any failure: logs a clear error, saves a timestamped screenshot to
+- On any failure: logs ``[FAIL]``, saves a timestamped screenshot to
   ``screenshots/``, and exits with a non-zero status code.
+
+Usage
+-----
+    python main.py [--headless]
+
+``--headless`` runs Chrome without a visible window (useful on CI servers); it
+overrides the ``browser.headless`` setting in credentials.json.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
+import time
 
 from pages.chat_list_page import ChatListPage
 from pages.login_page import LoginPage
@@ -29,6 +38,17 @@ from utils.screenshot import save_screenshot
 # Exit codes consumed by CI / shell callers.
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Furgechat Web Chats automation.")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run Chrome in headless mode (no visible window) — useful for CI.",
+    )
+    return parser.parse_args()
 
 
 def _maybe_login(driver, base_url, login_cfg, timeout, logger) -> bool:
@@ -69,11 +89,16 @@ def main() -> int:
         ``EXIT_SUCCESS`` (0) if the chats screen loaded and was read, else
         ``EXIT_FAILURE``.
     """
+    args = _parse_args()
     logger = get_logger("web_chats")
     driver = None
+    start = time.perf_counter()
     try:
         # Pull all settings from credentials.json (never hardcoded).
         config = load_config()
+        if args.headless:
+            config.setdefault("browser", {})["headless"] = True
+            logger.info("Headless mode enabled via --headless.")
         base_url = config["base_url"].rstrip("/")
         chats_url = base_url + config.get("chats_path", "/chats")
         timeout = config.get("timeouts", {}).get("explicit_wait_seconds", 20)
@@ -84,6 +109,7 @@ def main() -> int:
 
         # Step 1: optional authentication.
         if not _maybe_login(driver, base_url, login_cfg, timeout, logger):
+            logger.error("[FAIL] Could not sign in; aborting before the chats list.")
             save_screenshot(driver, label="login_failed")
             return EXIT_FAILURE
 
@@ -95,7 +121,7 @@ def main() -> int:
         # If the screen did not render, the app most likely required a login.
         if not chat_page.is_loaded():
             logger.error(
-                "The chats list did not load. If the app requires login, set "
+                "[FAIL] The chats list did not load. If the app requires login, set "
                 "login.enabled=true in credentials.json and run again."
             )
             save_screenshot(driver, label="chats_not_loaded")
@@ -105,17 +131,19 @@ def main() -> int:
         chats = chat_page.get_chats()
         if not chats:
             logger.warning("No chats are currently visible under the 'Chats' tab.")
+            logger.info("[PASS] Chats screen loaded; 0 chats to list (%.1fs).", time.perf_counter() - start)
             return EXIT_SUCCESS
 
         logger.info("Found %d chat(s) under the 'Chats' tab:", len(chats))
         for chat in chats:
             logger.info('  [%s] %s - "%s"', chat["id"], chat["name"], chat["preview"])
+        logger.info("[PASS] Listed %d chat(s) (%.1fs).", len(chats), time.perf_counter() - start)
         return EXIT_SUCCESS
 
     # Broad catch is intentional: the failure contract (clear message +
     # screenshot + non-zero exit) must hold for ANY error.
     except Exception:
-        logger.exception("Chats test aborted due to an unexpected error.")
+        logger.exception("[FAIL] Chats test aborted due to an unexpected error.")
         if driver is not None:
             try:
                 shot = save_screenshot(driver, label="chats_error")

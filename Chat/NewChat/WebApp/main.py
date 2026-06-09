@@ -5,19 +5,29 @@ Test scenario
 -------------
 1. Log in (creating a chat is an authenticated action; on by default).
 2. Open the "New Chat" tab.
-3. Enter a recipient and the first message, then submit.
-4. Verify the chat was created (the new-chat form goes away).
+3. Enter a recipient and the first message, then submit (handling the page's
+   "Confirm Chat" modal, which only honours real pointer events).
+4. Verify the chat was created (the "…created!" confirmation).
 
 Outcome contract
 ----------------
-- On success: logs "NEW CHAT CREATED" and exits 0.
-- On any failure: logs a clear error, saves a timestamped screenshot to
+- On success: logs ``[PASS]`` and exits 0.
+- On any failure: logs ``[FAIL]``, saves a timestamped screenshot to
   ``screenshots/``, and exits with a non-zero status code.
+
+Usage
+-----
+    python main.py [--headless]
+
+``--headless`` runs Chrome without a visible window (useful on CI servers); it
+overrides the ``browser.headless`` setting in credentials.json.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
+import time
 
 from pages.login_page import LoginPage
 from pages.new_chat_page import NewChatPage
@@ -30,6 +40,17 @@ from utils.screenshot import save_screenshot
 # Exit codes consumed by CI / shell callers.
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Furgechat Web New Chat automation.")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run Chrome in headless mode (no visible window) — useful for CI.",
+    )
+    return parser.parse_args()
 
 
 def _maybe_login(driver, base_url, login_cfg, timeout, logger) -> bool:
@@ -86,11 +107,16 @@ def main() -> int:
     Returns:
         ``EXIT_SUCCESS`` (0) if the chat is created, else ``EXIT_FAILURE``.
     """
+    args = _parse_args()
     logger = get_logger("web_new_chat")
     driver = None
+    start = time.perf_counter()
     try:
         # Pull all settings/content from credentials.json (never hardcoded).
         config = load_config()
+        if args.headless:
+            config.setdefault("browser", {})["headless"] = True
+            logger.info("Headless mode enabled via --headless.")
         base_url = config["base_url"].rstrip("/")
         new_chat_url = base_url + config.get("new_chat_path", "/new-chat")
         timeout = config.get("timeouts", {}).get("explicit_wait_seconds", 20)
@@ -105,6 +131,7 @@ def main() -> int:
 
         # Step 1: authenticate (creating a chat needs a session).
         if not _maybe_login(driver, base_url, login_cfg, timeout, logger):
+            logger.error("[FAIL] Could not sign in; cannot create a chat.")
             save_screenshot(driver, label="login_failed")
             return EXIT_FAILURE
 
@@ -116,7 +143,7 @@ def main() -> int:
         # If the form did not render, the app most likely required a login.
         if not new_chat_page.is_loaded():
             logger.error(
-                "The New Chat form did not load. If the app requires login, set "
+                "[FAIL] The New Chat form did not load. If the app requires login, set "
                 "login.enabled=true in credentials.json and run again."
             )
             save_screenshot(driver, label="new_chat_not_loaded")
@@ -130,7 +157,9 @@ def main() -> int:
         # Step 4: verify the chat was created.
         if new_chat_page.is_chat_created():
             logger.info(
-                "NEW CHAT CREATED with '%s'; first message sent.", recipient
+                "[PASS] New chat created with '%s'; first message sent (%.1fs).",
+                recipient,
+                time.perf_counter() - start,
             )
             return EXIT_SUCCESS
 
@@ -140,7 +169,7 @@ def main() -> int:
             "Chat was not created — still on the New Chat page "
             "(the recipient may be unknown or the message was rejected)."
         )
-        logger.error("NEW CHAT FAILED: %s", message_out)
+        logger.error("[FAIL] New chat not created: %s", message_out)
         shot = save_screenshot(driver, label="new_chat_failed")
         logger.error("Screenshot saved to %s", shot)
         return EXIT_FAILURE
@@ -148,7 +177,7 @@ def main() -> int:
     # Broad catch is intentional: the failure contract (clear message +
     # screenshot + non-zero exit) must hold for ANY error.
     except Exception:
-        logger.exception("New Chat test aborted due to an unexpected error.")
+        logger.exception("[FAIL] New Chat test aborted due to an unexpected error.")
         if driver is not None:
             try:
                 shot = save_screenshot(driver, label="new_chat_error")

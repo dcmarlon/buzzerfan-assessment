@@ -11,14 +11,23 @@ Test scenario
 
 Outcome contract
 ----------------
-- On success: logs "LOGIN SUCCESSFUL" and exits 0.
-- On any failure: logs a clear error, saves a timestamped screenshot to
+- On success: logs ``[PASS]`` and exits 0.
+- On any failure: logs ``[FAIL]``, saves a timestamped screenshot to
   ``screenshots/``, and exits with a non-zero status code.
+
+Usage
+-----
+    python main.py [--headless]
+
+``--headless`` runs Chrome without a visible window (useful on CI servers); it
+overrides the ``browser.headless`` setting in credentials.json.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
+import time
 
 from pages.login_page import LoginPage
 from pages.register_page import RegisterPage
@@ -32,17 +41,33 @@ EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 
 
+def _parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Furgechat Web Login automation.")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run Chrome in headless mode (no visible window) — useful for CI.",
+    )
+    return parser.parse_args()
+
+
 def main() -> int:
     """Run the login test and return a process exit code.
 
     Returns:
         ``EXIT_SUCCESS`` (0) if login is confirmed, otherwise ``EXIT_FAILURE``.
     """
+    args = _parse_args()
     logger = get_logger("web_login")
     driver = None
+    start = time.perf_counter()
     try:
         # Pull all settings/credentials from credentials.json (never hardcoded).
         config = load_config()
+        if args.headless:
+            config.setdefault("browser", {})["headless"] = True
+            logger.info("Headless mode enabled via --headless.")
         # The login form lives on the app's /login route, not the root URL.
         login_url = config["base_url"].rstrip("/") + config.get("login_path", "/login")
         username = config["credentials"]["username"]
@@ -76,14 +101,14 @@ def main() -> int:
         # Confirm success by waiting for a marker element that only appears
         # once the user is authenticated.
         if login_page.is_login_successful():
-            logger.info("LOGIN SUCCESSFUL for user '%s'.", username)
+            logger.info("[PASS] Login succeeded for user '%s' (%.1fs).", username, time.perf_counter() - start)
             return EXIT_SUCCESS
 
         # Login did not succeed — capture any on-screen error for context,
         # then record visual evidence.
         error_text = login_page.get_error_text()
         message = error_text or "Login did not complete — still on the login page (check credentials and that the captcha/submit step ran)."
-        logger.error("LOGIN FAILED: %s", message)
+        logger.error("[FAIL] Login failed: %s", message)
         shot = save_screenshot(driver, label="login_failed")
         logger.error("Screenshot saved to %s", shot)
         return EXIT_FAILURE
@@ -92,7 +117,7 @@ def main() -> int:
     # screenshot + non-zero exit) must hold for ANY error, including config
     # problems, browser crashes, and missing elements.
     except Exception:
-        logger.exception("Login test aborted due to an unexpected error.")
+        logger.exception("[FAIL] Login test aborted due to an unexpected error.")
         if driver is not None:
             try:
                 shot = save_screenshot(driver, label="login_error")
